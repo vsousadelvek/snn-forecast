@@ -81,13 +81,24 @@ def main():
                 kk = np.ones(3) / 3
                 past[:, 0] = np.convolve(past[:, 0], kk, "same")
                 past[:, 1] = np.convolve(past[:, 1], kk, "same")
-                deltas = np.diff(past, axis=0) / 32.0
-                xin = torch.from_numpy(deltas[None].astype(np.float32)).to(device)
+                deltas = np.diff(past, axis=0)
+                speed = np.linalg.norm(deltas, axis=1).mean() + 1e-3
+                xin = torch.from_numpy(
+                    (deltas / speed)[None].astype(np.float32)).to(device)
                 with torch.no_grad():
-                    t.pred = model(xin)[0].cpu().numpy().reshape(-1, 2)
-                t.pred_abs = t.centroid + t.pred * 64.0
+                    p = model(xin)[0].cpu().numpy().reshape(-1, 2)
+                new_pred = t.centroid + p * speed * 16.0
+                # EMA entre previsoes consecutivas -> caminho estavel
+                if getattr(t, "pred_abs", None) is not None:
+                    t.pred_abs = 0.55 * t.pred_abs + 0.45 * new_pred
+                else:
+                    t.pred_abs = new_pred
             if getattr(t, "pred_abs", None) is not None:
-                fut = np.vstack([t.centroid, t.pred_abs]) * [sx, sy]
+                # suaviza os pontos por horizonte (media movel)
+                sm = t.pred_abs.copy()
+                sm[1:-1] = (t.pred_abs[:-2] + t.pred_abs[1:-1]
+                            + t.pred_abs[2:]) / 3
+                fut = np.vstack([t.centroid, sm]) * [sx, sy]
                 pts_f = [tuple(p.astype(int)) for p in fut]
                 for a, b in zip(pts_f, pts_f[1:]):
                     cv2.line(view, a, b, (0, 255, 0), 2)

@@ -37,10 +37,21 @@ class RealTrajDataset(Dataset):
         # entrada = deltas (velocidade) / 32px, alvo = deslocamento
         # acumulado relativo ao ultimo ponto, /64px
         past = seg[:K_PAST]
-        deltas = np.diff(past, axis=0) / 32.0
-        fut = np.concatenate([seg[K_PAST + h] - past[-1] for h in HORIZONS]) / 64.0
+        deltas = np.diff(past, axis=0)                       # (K-1, 2) em px
+        fut_px = np.stack([seg[K_PAST + h] - past[-1] for h in HORIZONS])
+        # normaliza pela velocidade media da trajetoria (scale-invariante)
+        speed = np.linalg.norm(deltas, axis=1).mean() + 1e-3
+        deltas = deltas / speed
+        fut = fut_px / (speed * 16.0)
+        # augment: flip x, flip y, ruido
+        if np.random.rand() < 0.3:
+            deltas[:, 0] = -deltas[:, 0]; fut[:, 0] = -fut[:, 0]
+        if np.random.rand() < 0.3:
+            deltas[:, 1] = -deltas[:, 1]; fut[:, 1] = -fut[:, 1]
+        deltas += np.random.normal(0, 0.05, deltas.shape)
         return (torch.from_numpy(deltas.astype(np.float32)),
-                torch.from_numpy(fut.astype(np.float32)))
+                torch.from_numpy(fut.astype(np.float32).reshape(-1)),
+                np.float32(speed))
 
 
 def main():
@@ -66,7 +77,7 @@ def main():
     best = 1e9
     for ep in range(1, args.epochs + 1):
         model.train()
-        for x, y in dl:
+        for x, y, _ in dl:
             x, y = x.to(device), y.to(device)
             loss = loss_fn(model(x), y)
             opt.zero_grad(set_to_none=True)
@@ -75,10 +86,11 @@ def main():
         model.eval()
         errs = []
         with torch.no_grad():
-            for x, y in dl_te:
+            for x, y, spd in dl_te:
                 p = model(x.to(device)).cpu().numpy().reshape(-1, len(HORIZONS), 2)
-                e = np.linalg.norm((p - y.numpy().reshape(-1, len(HORIZONS), 2))
-                                   * 64.0, axis=2)
+                scale = spd.numpy()[:, None, None] * 16.0
+                e = np.linalg.norm(
+                    (p - y.numpy().reshape(-1, len(HORIZONS), 2)) * scale, axis=2)
                 errs.append(e)
         e = np.concatenate(errs)
         mae = float(e.mean())

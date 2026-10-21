@@ -34,11 +34,11 @@ class LIF(nn.Module):
 
 
 class SeqForecastSNN(nn.Module):
-    """Le (x,y) por timestep; ultima membrana -> n_pred posicoes."""
+    """Le (dx,dy, x_abs,y_abs) por timestep; ultima membrana -> n_pred."""
 
     def __init__(self, n_pred=5, hidden=96):
         super().__init__()
-        self.fc_in = nn.Linear(2, hidden)
+        self.fc_in = nn.Linear(4, hidden)
         self.lif1 = LIF()
         self.fc_h = nn.Linear(hidden, hidden)
         self.lif2 = LIF()

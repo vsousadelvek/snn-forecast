@@ -83,8 +83,10 @@ def main():
                 past[:, 1] = np.convolve(past[:, 1], kk, "same")
                 deltas = np.diff(past, axis=0)
                 speed = np.linalg.norm(deltas, axis=1).mean() + 1e-3
+                pos_abs = past[1:] / np.array([EV_W, EV_H])
+                inp = np.concatenate([deltas / speed, pos_abs], axis=1)
                 xin = torch.from_numpy(
-                    (deltas / speed)[None].astype(np.float32)).to(device)
+                    inp[None].astype(np.float32)).to(device)
                 with torch.no_grad():
                     p = model(xin)[0].cpu().numpy().reshape(-1, 2)
                 new_pred = t.centroid + p * speed * 16.0

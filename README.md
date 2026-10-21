@@ -29,9 +29,10 @@ simulador balístico -> frames -> eventos ON/OFF (DVS)
 Pipeline completo em footage real de tráfego (`src/demo_real.py`):
 eventos DVS → detecção por clustering → **tracker com Kalman** extrai
 trajetórias reais (auto-labeling, ~270 trajetórias de vídeos da web) →
-**SeqForecastSNN** lê os últimos 16 centroides como *deltas* (velocidade)
-e regrediza deslocamento acumulado — ~27px de erro médio prevendo
-+4..+20 frames de cada carro em tempo real.
+**SeqForecastSNN** lê os últimos 16 centroides como *deltas* normalizados
+por velocidade + **posição absoluta** (contexto de faixa) e regrediza
+deslocamento acumulado — ~27px de erro médio prevendo +4..+20 frames
+de cada carro em tempo real.
 
 ## Uso
 

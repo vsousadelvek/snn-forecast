@@ -43,13 +43,12 @@ class RealTrajDataset(Dataset):
         speed = np.linalg.norm(deltas, axis=1).mean() + 1e-3
         deltas = deltas / speed
         fut = fut_px / (speed * 16.0)
-        # augment: flip x, flip y, ruido
-        if np.random.rand() < 0.3:
-            deltas[:, 0] = -deltas[:, 0]; fut[:, 0] = -fut[:, 0]
-        if np.random.rand() < 0.3:
-            deltas[:, 1] = -deltas[:, 1]; fut[:, 1] = -fut[:, 1]
-        deltas += np.random.normal(0, 0.05, deltas.shape)
-        return (torch.from_numpy(deltas.astype(np.float32)),
+        # concatena posicao absoluta normalizada -> rede sabe a faixa/lane
+        pos_abs = past[1:] / np.array([320.0, 240.0])
+        inp = np.concatenate([deltas, pos_abs], axis=1)      # (K-1, 4)
+        # augment: so ruido nos deltas — flips quebram a semantica direcional
+        inp[:, :2] += np.random.normal(0, 0.05, deltas.shape)
+        return (torch.from_numpy(inp.astype(np.float32)),
                 torch.from_numpy(fut.astype(np.float32).reshape(-1)),
                 np.float32(speed))
 

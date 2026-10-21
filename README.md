@@ -22,6 +22,16 @@ simulador balístico -> frames -> eventos ON/OFF (DVS)
 - Cyan: passado real | Cinza: futuro real | Verde: futuro **previsto pela SNN**
 - A linha verde acompanha o arco — inclusive a curva do quique
 
+## Vídeo real
+
+![Forecast em video real](demo/real.gif)
+
+Pipeline completo em footage real de tráfego (`src/demo_real.py`):
+eventos DVS → detecção por clustering → **tracker com Kalman** extrai
+trajetórias reais (auto-labeling, 116 trajetórias de vídeos da web) →
+**SeqForecastSNN** lê os últimos 16 centroides timestep a timestep e
+prevê os próximos +4..+20 frames de cada carro em tempo real.
+
 ## Uso
 
 ```bash

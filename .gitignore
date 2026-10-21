@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 demo/chk*.png
 demo/forecast.mp4
+
+raw/
+data/
+demo/real.mp4

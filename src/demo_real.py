@@ -77,12 +77,17 @@ def main():
 
             # previsao a cada PREDICT_EVERY frames, desenhada sempre
             if len(t.trail) >= K_PAST and tick % PREDICT_EVERY == 0:
-                past = np.array(t.trail[-K_PAST:]) / np.array([EV_W, EV_H])
-                xin = torch.from_numpy(past[None].astype(np.float32)).to(device)
+                past = np.array(t.trail[-K_PAST:], dtype=np.float32)
+                kk = np.ones(3) / 3
+                past[:, 0] = np.convolve(past[:, 0], kk, "same")
+                past[:, 1] = np.convolve(past[:, 1], kk, "same")
+                deltas = np.diff(past, axis=0) / 32.0
+                xin = torch.from_numpy(deltas[None].astype(np.float32)).to(device)
                 with torch.no_grad():
                     t.pred = model(xin)[0].cpu().numpy().reshape(-1, 2)
-            if getattr(t, "pred", None) is not None:
-                fut = np.vstack([t.centroid / [EV_W, EV_H], t.pred]) * [400, 400]
+                t.pred_abs = t.centroid + t.pred * 64.0
+            if getattr(t, "pred_abs", None) is not None:
+                fut = np.vstack([t.centroid, t.pred_abs]) * [sx, sy]
                 pts_f = [tuple(p.astype(int)) for p in fut]
                 for a, b in zip(pts_f, pts_f[1:]):
                     cv2.line(view, a, b, (0, 255, 0), 2)

@@ -29,10 +29,17 @@ class RealTrajDataset(Dataset):
     def __getitem__(self, i):
         tr = self.windows[i]
         s = np.random.randint(K_PAST, len(tr) - max(HORIZONS))
-        past = tr[s - K_PAST:s] / np.array([320.0, 240.0])
-        fut = np.concatenate([tr[s + h] / np.array([320.0, 240.0])
-                              for h in HORIZONS])
-        return (torch.from_numpy(past.astype(np.float32)),
+        # suaviza jitter do tracker
+        seg = tr[s - K_PAST:s + max(HORIZONS) + 1].copy()
+        k = np.ones(3) / 3
+        seg[:, 0] = np.convolve(seg[:, 0], k, "same")
+        seg[:, 1] = np.convolve(seg[:, 1], k, "same")
+        # entrada = deltas (velocidade) / 32px, alvo = deslocamento
+        # acumulado relativo ao ultimo ponto, /64px
+        past = seg[:K_PAST]
+        deltas = np.diff(past, axis=0) / 32.0
+        fut = np.concatenate([seg[K_PAST + h] - past[-1] for h in HORIZONS]) / 64.0
+        return (torch.from_numpy(deltas.astype(np.float32)),
                 torch.from_numpy(fut.astype(np.float32)))
 
 
@@ -71,7 +78,7 @@ def main():
             for x, y in dl_te:
                 p = model(x.to(device)).cpu().numpy().reshape(-1, len(HORIZONS), 2)
                 e = np.linalg.norm((p - y.numpy().reshape(-1, len(HORIZONS), 2))
-                                   * np.array([320, 240]), axis=2)
+                                   * 64.0, axis=2)
                 errs.append(e)
         e = np.concatenate(errs)
         mae = float(e.mean())
